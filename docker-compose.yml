@@ -1,0 +1,32 @@
+version: "3"
+services:
+  server:
+    image: ppcelery/go-mutual-tcp-tls:server-657905a
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "30m"
+    ports:
+      - 24444:24444
+    ulimits:
+      nofile:
+        soft: 655350
+        hard: 655350
+    command: --addr 0.0.0.0:24444
+  client:
+    image: ppcelery/go-mutual-tcp-tls:client-657905a
+    restart: always
+    depends_on:
+      - server
+    links:
+      - server:localhost
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "30m"
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    command: --addr localhost:24444 --nfork 20000

@@ -5,9 +5,9 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"io/ioutil"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -73,23 +73,24 @@ func setupTLS() *tls.Config {
 func main() {
 	setupArgs()
 	ctx := context.Background()
-	go runHeartBeat(ctx)
-	runListener(ctx)
+	nConn := int64(0)
+	go runHeartBeat(ctx, &nConn)
+	runListener(ctx, &nConn)
 }
 
-func runHeartBeat(ctx context.Context) {
+func runHeartBeat(ctx context.Context, nConn *int64) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			utils.Logger.Info("heartbeat")
-			time.Sleep(1 * time.Minute)
+			utils.Logger.Info("heartbeat", zap.Int64("conn", atomic.LoadInt64(nConn)))
+			time.Sleep(5 * time.Second)
 		}
 	}
 }
 
-func runListener(ctx context.Context) {
+func runListener(ctx context.Context, nConn *int64) {
 	tlsConfig := setupTLS()
 
 LISTEN_LOOP:
@@ -108,10 +109,6 @@ LISTEN_LOOP:
 		}
 		utils.Logger.Info("listening...", zap.String("addr", utils.Settings.GetString("addr")))
 
-		var (
-			tlsConn *tls.Conn
-			ok      bool
-		)
 	ACCEPT_LOOP:
 		for {
 			select {
@@ -126,42 +123,53 @@ LISTEN_LOOP:
 				break ACCEPT_LOOP
 			}
 
-			if tlsConn, ok = conn.(*tls.Conn); !ok {
-				utils.Logger.Error("convert connection to tlsconn got error", zap.Error(err))
-				continue ACCEPT_LOOP
-			}
-			// verify cert
-			if err = tlsConn.Handshake(); err != nil {
-				utils.Logger.Error("handshake got error", zap.Error(err))
-				continue ACCEPT_LOOP
-			}
-			// print client's cert information
-			state := tlsConn.ConnectionState()
-			utils.Logger.Debug("accept tls connection",
-				zap.Uint16("Version", state.Version),
-				zap.Bool("HandshakeComplete", state.HandshakeComplete),
-				zap.Bool("DidResume", state.DidResume),
-				zap.Uint16("CipherSuite", state.CipherSuite),
-				zap.String("NegotiatedProtocol", state.NegotiatedProtocol),
-				zap.Bool("NegotiatedProtocolIsMutual", state.NegotiatedProtocolIsMutual))
-			for i, cert := range state.PeerCertificates {
-				subject := cert.Subject
-				issuer := cert.Issuer
-				fmt.Printf("    --------------- cert[%d] ---------------\n", i)
-				fmt.Printf("    %v s:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n", subject.SerialNumber, subject.Country, subject.Province, subject.Locality, subject.Organization, subject.OrganizationalUnit, subject.CommonName)
-				fmt.Printf("        i:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n", issuer.Country, issuer.Province, issuer.Locality, issuer.Organization, issuer.OrganizationalUnit, issuer.CommonName)
-			}
-
-			go handle(tlsConn)
+			atomic.AddInt64(nConn, 1)
+			go handle(conn, nConn)
 		}
 		ln.Close()
 	}
 }
 
-func handle(conn net.Conn) {
+func showCert(conn net.Conn) {
+	var (
+		tlsConn *tls.Conn
+		ok      bool
+		err     error
+	)
+	if tlsConn, ok = conn.(*tls.Conn); !ok {
+		utils.Logger.Error("convert connection to tlsconn got error", zap.Error(err))
+	}
+
+	// verify cert
+	if err = tlsConn.Handshake(); err != nil {
+		utils.Logger.Error("handshake got error", zap.Error(err))
+	}
+
+	// print client's cert information
+	// state := tlsConn.ConnectionState()
+	// utils.Logger.Debug("accept tls connection",
+	// 	zap.Uint16("Version", state.Version),
+	// 	zap.Bool("HandshakeComplete", state.HandshakeComplete),
+	// 	zap.Bool("DidResume", state.DidResume),
+	// 	zap.Uint16("CipherSuite", state.CipherSuite),
+	// 	zap.String("NegotiatedProtocol", state.NegotiatedProtocol),
+	// 	zap.Bool("NegotiatedProtocolIsMutual", state.NegotiatedProtocolIsMutual))
+	// for i, cert := range state.PeerCertificates {
+	// 	subject := cert.Subject
+	// 	issuer := cert.Issuer
+	// 	fmt.Printf("    --------------- cert[%d] ---------------\n", i)
+	// 	fmt.Printf("    %v s:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n", subject.SerialNumber, subject.Country, subject.Province, subject.Locality, subject.Organization, subject.OrganizationalUnit, subject.CommonName)
+	// 	fmt.Printf("        i:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n", issuer.Country, issuer.Province, issuer.Locality, issuer.Organization, issuer.OrganizationalUnit, issuer.CommonName)
+	// }
+
+}
+
+func handle(conn net.Conn, nConn *int64) {
 	utils.Logger.Info("got connection", zap.String("remote", conn.RemoteAddr().String()))
 	defer utils.Logger.Info("close connection", zap.String("remote", conn.RemoteAddr().String()))
+	defer atomic.AddInt64(nConn, -1)
 	defer conn.Close()
+	showCert(conn)
 	reader := bufio.NewReader(conn)
 	var (
 		err     error
@@ -169,10 +177,10 @@ func handle(conn net.Conn) {
 	)
 	for { // read data from client
 		if content, err = reader.ReadString('\n'); err != nil {
-			utils.Logger.Error("try to read got error", zap.Error(err))
+			utils.Logger.Warn("try to read got error", zap.Error(err))
 			break
 		}
 
-		utils.Logger.Info("got", zap.String("cnt", content))
+		utils.Logger.Debug("got", zap.String("cnt", content))
 	}
 }
