@@ -1,6 +1,6 @@
 # go-mutual-tcp-tls
 
-mutual tcp tls
+tcp with mutual tls
 
 
 ## Run
