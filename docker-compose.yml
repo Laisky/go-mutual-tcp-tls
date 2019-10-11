@@ -9,11 +9,12 @@ services:
         max-size: "30m"
     ports:
       - 24444:24444
+      - 8080:8080
     ulimits:
       nofile:
         soft: 655350
         hard: 655350
-    command: --addr 0.0.0.0:24444
+    command: --addr 0.0.0.0:24444 --http-addr 0.0.0.0:8080
   client:
     image: ppcelery/go-mutual-tcp-tls:client-657905a
     restart: always

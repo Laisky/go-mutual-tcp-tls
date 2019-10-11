@@ -52,3 +52,35 @@ docker build . -f client.Dockerfile -t ppcelery/go-mutual-tcp-tls:client-b2a863f
 
 docker-compose -f docker-compose.yml up -d --remove-orphans --force-recreate
 ```
+
+Metrics:
+
+* Prometheus metrics: <http://localhost:8080/metrics>
+* pprof: <http://localhost:8080/pprof>
+
+```sh
+docker logs go-mutual-tcp-tls_server_1 -f | grep heart
+
+{"level":"info","ts":"2019-10-11T08:24:12.555Z","caller":"server/server.go:87","message":"heartbeat","conn":0}
+{"level":"info","ts":"2019-10-11T08:24:17.557Z","caller":"server/server.go:87","message":"heartbeat","conn":12349}
+{"level":"info","ts":"2019-10-11T08:24:22.566Z","caller":"server/server.go:87","message":"heartbeat","conn":18572}
+{"level":"info","ts":"2019-10-11T08:24:27.566Z","caller":"server/server.go:87","message":"heartbeat","conn":18572}
+{"level":"info","ts":"2019-10-11T08:24:32.568Z","caller":"server/server.go:87","message":"heartbeat","conn":27273}
+{"level":"info","ts":"2019-10-11T08:24:37.570Z","caller":"server/server.go:87","message":"heartbeat","conn":55291}
+{"level":"info","ts":"2019-10-11T08:24:42.570Z","caller":"server/server.go:87","message":"heartbeat","conn":70846}
+{"level":"info","ts":"2019-10-11T08:24:47.572Z","caller":"server/server.go:87","message":"heartbeat","conn":76812}
+{"level":"info","ts":"2019-10-11T08:24:52.573Z","caller":"server/server.go:87","message":"heartbeat","conn":85090}
+{"level":"info","ts":"2019-10-11T08:24:57.575Z","caller":"server/server.go:87","message":"heartbeat","conn":85090}
+{"level":"info","ts":"2019-10-11T08:25:02.612Z","caller":"server/server.go:87","message":"heartbeat","conn":85157}
+{"level":"info","ts":"2019-10-11T08:25:07.612Z","caller":"server/server.go:87","message":"heartbeat","conn":90541}
+{"level":"info","ts":"2019-10-11T08:25:12.688Z","caller":"server/server.go:87","message":"heartbeat","conn":90541}
+{"level":"info","ts":"2019-10-11T08:25:17.692Z","caller":"server/server.go:87","message":"heartbeat","conn":90541}
+{"level":"info","ts":"2019-10-11T08:25:22.847Z","caller":"server/server.go:87","message":"heartbeat","conn":90541}
+{"level":"info","ts":"2019-10-11T08:25:27.851Z","caller":"server/server.go:87","message":"heartbeat","conn":90541}
+{"level":"info","ts":"2019-10-11T08:25:32.852Z","caller":"server/server.go:87","message":"heartbeat","conn":90541}
+{"level":"info","ts":"2019-10-11T08:25:38.022Z","caller":"server/server.go:87","message":"heartbeat","conn":95346}
+{"level":"info","ts":"2019-10-11T08:25:43.026Z","caller":"server/server.go:87","message":"heartbeat","conn":95346}
+{"level":"info","ts":"2019-10-11T08:25:48.030Z","caller":"server/server.go:87","message":"heartbeat","conn":95346}
+{"level":"info","ts":"2019-10-11T08:25:53.031Z","caller":"server/server.go:87","message":"heartbeat","conn":95346}
+{"level":"info","ts":"2019-10-11T08:25:58.032Z","caller":"server/server.go:87","message":"heartbeat","conn":95346}
+```

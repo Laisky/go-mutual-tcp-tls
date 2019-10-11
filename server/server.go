@@ -10,6 +10,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	middlewares "github.com/Laisky/go-utils/gin-middlewares"
+
+	"github.com/gin-contrib/pprof"
+	"github.com/gin-gonic/gin"
+
 	"github.com/spf13/pflag"
 
 	"github.com/Laisky/go-utils"
@@ -22,6 +27,7 @@ func setupArgs() {
 	pflag.String("crt", "server.crt", "server crt file path")          // server cert
 	pflag.String("crt-key", "server.key.text", "server key file path") // server key
 	pflag.String("addr", "localhost:24444", "server listening port")
+	pflag.String("http-addr", "localhost:8080", "http listening port")
 	pflag.Parse()
 	utils.Settings.BindPFlags(pflag.CommandLine)
 
@@ -75,7 +81,16 @@ func main() {
 	ctx := context.Background()
 	nConn := int64(0)
 	go runHeartBeat(ctx, &nConn)
+	go runMetric()
 	runListener(ctx, &nConn)
+}
+
+func runMetric() {
+	s := gin.New()
+	pprof.Register(s, "pprof")
+	middlewares.BindPrometheus(s)
+	utils.Logger.Info("listening on http", zap.String("http-addr", utils.Settings.GetString("http-addr")))
+	utils.Logger.Panic("server exit", zap.Error(s.Run(utils.Settings.GetString("http-addr"))))
 }
 
 func runHeartBeat(ctx context.Context, nConn *int64) {
