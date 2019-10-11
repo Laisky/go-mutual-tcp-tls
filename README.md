@@ -42,4 +42,13 @@ openssl req -new -key client.key -out client.csr
 openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
 ```
 
+## docker
 
+build:
+
+```sh
+docker build . -f server.Dockerfile -t ppcelery/go-mutual-tcp-tls:server-b2a863f
+docker build . -f client.Dockerfile -t ppcelery/go-mutual-tcp-tls:client-b2a863f
+
+docker-compose -f docker-compose.yml up -d --remove-orphans --force-recreate
+```

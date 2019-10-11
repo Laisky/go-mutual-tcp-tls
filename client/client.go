@@ -19,6 +19,7 @@ func setupArgs() {
 	pflag.String("crt", "client.crt", "client crt file path")          // client cert
 	pflag.String("crt-key", "client.key.text", "client key file path") // client key
 	pflag.String("addr", "localhost:24444", "client dial port")
+	pflag.Int("nfork", 1, "how many connections")
 	pflag.Parse()
 	utils.Settings.BindPFlags(pflag.CommandLine)
 
@@ -69,28 +70,52 @@ func setupTLS() *tls.Config {
 func main() {
 	setupArgs()
 	ctx := context.Background()
-	runClient(ctx)
+	tlsConfig := setupTLS()
+	for i := 0; i < utils.Settings.GetInt("nfork"); i++ {
+		go runClient(ctx, tlsConfig)
+	}
+
+	<-ctx.Done()
 }
 
-func runClient(ctx context.Context) {
-	tlsConfig := setupTLS()
-	conn, err := tls.Dial("tcp", utils.Settings.GetString("addr"), tlsConfig)
-	if err != nil {
-		utils.Logger.Panic("try to dial tcp got error", zap.Error(err))
-	}
-	defer conn.Close()
-	utils.Logger.Info("connected to remote", zap.String("remote", conn.RemoteAddr().String()))
+func runClient(ctx context.Context, tlsConfig *tls.Config) {
+CONN_LOOP:
+	for {
+		select {
+		case <-ctx.Done():
+			break CONN_LOOP
+		default:
+		}
 
-	writer := bufio.NewWriter(conn)
-	utils.Logger.Info("start writing")
-	for { // send data
-		utils.Logger.Info("sending...")
-		if _, err = writer.WriteString("hello, world\n"); err != nil {
-			utils.Logger.Panic("try to write got error", zap.Error(err))
+		conn, err := tls.Dial("tcp", utils.Settings.GetString("addr"), tlsConfig)
+		if err != nil {
+			utils.Logger.Error("try to dial tcp got error", zap.Error(err))
+			time.Sleep(3 * time.Second)
+			continue CONN_LOOP
 		}
-		if err = writer.Flush(); err != nil {
-			utils.Logger.Panic("try to flush got error", zap.Error(err))
+		utils.Logger.Info("connected to remote", zap.String("remote", conn.RemoteAddr().String()))
+
+		writer := bufio.NewWriter(conn)
+	SEND_LOOP:
+		for { // send data
+			select {
+			case <-ctx.Done():
+				break SEND_LOOP
+			default:
+			}
+
+			utils.Logger.Debug("sending...")
+			if _, err = writer.WriteString("hello, world\n"); err != nil {
+				utils.Logger.Error("try to write got error", zap.Error(err))
+				break SEND_LOOP
+			}
+			if err = writer.Flush(); err != nil {
+				utils.Logger.Error("try to flush got error", zap.Error(err))
+				break SEND_LOOP
+			}
+			time.Sleep(1 * time.Second)
 		}
-		time.Sleep(1 * time.Second)
+
+		conn.Close()
 	}
 }
