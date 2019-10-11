@@ -15,9 +15,9 @@ import (
 
 func setupArgs() {
 	pflag.Bool("debug", false, "run in debug mode")
-	pflag.String("ca", "ca.crt", "ca file path")
-	pflag.String("crt", "client.crt", "client crt file path")
-	pflag.String("crt-key", "client.key.text", "client key file path")
+	pflag.String("ca", "ca.crt", "ca file path")                       // CA to verify server's cert
+	pflag.String("crt", "client.crt", "client crt file path")          // client cert
+	pflag.String("crt-key", "client.key.text", "client key file path") // client key
 	pflag.String("addr", "localhost:24444", "client dial port")
 	pflag.Parse()
 	utils.Settings.BindPFlags(pflag.CommandLine)
@@ -59,8 +59,8 @@ func setupTLS() *tls.Config {
 	// https tls config
 	tlsConfig := &tls.Config{
 		Certificates:       []tls.Certificate{cliCert},
-		RootCAs:            caCertPool,
-		InsecureSkipVerify: false,
+		RootCAs:            caCertPool, // CA pool to verify server's cert
+		InsecureSkipVerify: false,      // must verify
 	}
 	tlsConfig.BuildNameToCertificate()
 	return tlsConfig
@@ -83,7 +83,7 @@ func runClient(ctx context.Context) {
 
 	writer := bufio.NewWriter(conn)
 	utils.Logger.Info("start writing")
-	for {
+	for { // send data
 		utils.Logger.Info("sending...")
 		if _, err = writer.WriteString("hello, world\n"); err != nil {
 			utils.Logger.Panic("try to write got error", zap.Error(err))

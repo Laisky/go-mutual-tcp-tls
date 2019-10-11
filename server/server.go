@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"time"
@@ -17,9 +18,9 @@ import (
 
 func setupArgs() {
 	pflag.Bool("debug", false, "run in debug mode")
-	pflag.String("ca", "ca.crt", "ca file path")
-	pflag.String("crt", "server.crt", "server crt file path")
-	pflag.String("crt-key", "server.key.text", "server key file path")
+	pflag.String("ca", "ca.crt", "ca file path")                       // CA, to verify client's cert
+	pflag.String("crt", "server.crt", "server crt file path")          // server cert
+	pflag.String("crt-key", "server.key.text", "server key file path") // server key
 	pflag.String("addr", "localhost:24444", "server listening port")
 	pflag.Parse()
 	utils.Settings.BindPFlags(pflag.CommandLine)
@@ -61,9 +62,9 @@ func setupTLS() *tls.Config {
 	// https tls config
 	tlsConfig := &tls.Config{
 		Certificates:       []tls.Certificate{srvCert},
-		ClientCAs:          caCertPool,
-		InsecureSkipVerify: false,
-		ClientAuth:         tls.RequireAndVerifyClientCert,
+		ClientCAs:          caCertPool,                     // CA pool to verify clients' cert
+		InsecureSkipVerify: false,                          // must verify
+		ClientAuth:         tls.RequireAndVerifyClientCert, // client must has verified cert
 	}
 	tlsConfig.BuildNameToCertificate()
 	return tlsConfig
@@ -99,11 +100,11 @@ LISTEN_LOOP:
 		default:
 		}
 
-		// tlsConfig.BuildNameToCertificate()
 		ln, err := tls.Listen("tcp", utils.Settings.GetString("addr"), tlsConfig)
 		if err != nil {
 			utils.Logger.Error("try to listen tcp got error", zap.Error(err))
-			break LISTEN_LOOP
+			time.Sleep(3 * time.Second)
+			continue LISTEN_LOOP
 		}
 		utils.Logger.Info("listening...", zap.String("addr", utils.Settings.GetString("addr")))
 
@@ -124,25 +125,32 @@ LISTEN_LOOP:
 				utils.Logger.Error("accept conn got error", zap.Error(err))
 				break ACCEPT_LOOP
 			}
+
 			if tlsConn, ok = conn.(*tls.Conn); !ok {
-				utils.Logger.Info("refuse connection since tls error")
+				utils.Logger.Error("convert connection to tlsconn got error", zap.Error(err))
 				continue ACCEPT_LOOP
 			}
-
-			// state := tlsConn.ConnectionState()
-			// utils.Logger.Debug("accept tls connection",
-			// 	zap.Uint16("Version", state.Version),
-			// 	zap.Bool("HandshakeComplete", state.HandshakeComplete),
-			// 	zap.Bool("DidResume", state.DidResume),
-			// 	zap.Uint16("CipherSuite", state.CipherSuite),
-			// 	zap.String("NegotiatedProtocol", state.NegotiatedProtocol),
-			// 	zap.Bool("NegotiatedProtocolIsMutual", state.NegotiatedProtocolIsMutual))
-			// for i, cert := range state.PeerCertificates {
-			// 	subject := cert.Subject
-			// 	issuer := cert.Issuer
-			// 	fmt.Printf(">> %d s:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n", i, subject.Country, subject.Province, subject.Locality, subject.Organization, subject.OrganizationalUnit, subject.CommonName)
-			// 	fmt.Printf(">>    i:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n", issuer.Country, issuer.Province, issuer.Locality, issuer.Organization, issuer.OrganizationalUnit, issuer.CommonName)
-			// }
+			// verify cert
+			if err = tlsConn.Handshake(); err != nil {
+				utils.Logger.Error("handshake got error", zap.Error(err))
+				continue ACCEPT_LOOP
+			}
+			// print client's cert information
+			state := tlsConn.ConnectionState()
+			utils.Logger.Debug("accept tls connection",
+				zap.Uint16("Version", state.Version),
+				zap.Bool("HandshakeComplete", state.HandshakeComplete),
+				zap.Bool("DidResume", state.DidResume),
+				zap.Uint16("CipherSuite", state.CipherSuite),
+				zap.String("NegotiatedProtocol", state.NegotiatedProtocol),
+				zap.Bool("NegotiatedProtocolIsMutual", state.NegotiatedProtocolIsMutual))
+			for i, cert := range state.PeerCertificates {
+				subject := cert.Subject
+				issuer := cert.Issuer
+				fmt.Printf("    --------------- cert[%d] ---------------\n", i)
+				fmt.Printf("    %v s:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n", subject.SerialNumber, subject.Country, subject.Province, subject.Locality, subject.Organization, subject.OrganizationalUnit, subject.CommonName)
+				fmt.Printf("        i:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n", issuer.Country, issuer.Province, issuer.Locality, issuer.Organization, issuer.OrganizationalUnit, issuer.CommonName)
+			}
 
 			go handle(tlsConn)
 		}
@@ -159,7 +167,7 @@ func handle(conn net.Conn) {
 		err     error
 		content string
 	)
-	for {
+	for { // read data from client
 		if content, err = reader.ReadString('\n'); err != nil {
 			utils.Logger.Error("try to read got error", zap.Error(err))
 			break
