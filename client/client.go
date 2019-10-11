@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
+	"sync/atomic"
 	"time"
 
 	"github.com/Laisky/go-utils"
@@ -71,14 +72,29 @@ func main() {
 	setupArgs()
 	ctx := context.Background()
 	tlsConfig := setupTLS()
+	nConn := int64(0)
+	go runHeartBeat(ctx, &nConn)
 	for i := 0; i < utils.Settings.GetInt("nfork"); i++ {
-		go runClient(ctx, tlsConfig)
+		go runClient(ctx, tlsConfig, &nConn)
 	}
 
 	<-ctx.Done()
 }
 
-func runClient(ctx context.Context, tlsConfig *tls.Config) {
+func runHeartBeat(ctx context.Context, nConn *int64) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			utils.Logger.Info("heartbeat", zap.Int64("conn", atomic.LoadInt64(nConn)))
+			utils.ForceGCUnBlocking()
+			time.Sleep(1 * time.Minute)
+		}
+	}
+}
+
+func runClient(ctx context.Context, tlsConfig *tls.Config, nConn *int64) {
 CONN_LOOP:
 	for {
 		select {
@@ -94,6 +110,7 @@ CONN_LOOP:
 			continue CONN_LOOP
 		}
 		utils.Logger.Info("connected to remote", zap.String("remote", conn.RemoteAddr().String()))
+		atomic.AddInt64(nConn, 1)
 
 		writer := bufio.NewWriter(conn)
 	SEND_LOOP:
@@ -116,6 +133,7 @@ CONN_LOOP:
 			time.Sleep(1 * time.Second)
 		}
 
+		atomic.AddInt64(nConn, -1)
 		conn.Close()
 	}
 }
