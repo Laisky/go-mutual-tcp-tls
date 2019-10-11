@@ -1,7 +1,7 @@
 version: "3"
 services:
   server:
-    image: ppcelery/go-mutual-tcp-tls:server-657905a
+    image: ppcelery/go-mutual-tcp-tls:server-4d83373
     restart: always
     logging:
       driver: "json-file"
@@ -16,7 +16,7 @@ services:
         hard: 655350
     command: --addr 0.0.0.0:24444 --http-addr 0.0.0.0:8080
   client:
-    image: ppcelery/go-mutual-tcp-tls:client-657905a
+    image: ppcelery/go-mutual-tcp-tls:client-4d83373
     restart: always
     depends_on:
       - server

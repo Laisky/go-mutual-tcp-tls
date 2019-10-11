@@ -100,7 +100,8 @@ func runHeartBeat(ctx context.Context, nConn *int64) {
 			return
 		default:
 			utils.Logger.Info("heartbeat", zap.Int64("conn", atomic.LoadInt64(nConn)))
-			time.Sleep(5 * time.Second)
+			utils.ForceGCUnBlocking()
+			time.Sleep(1 * time.Minute)
 		}
 	}
 }
