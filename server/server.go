@@ -29,7 +29,9 @@ func setupArgs() {
 	pflag.String("addr", "localhost:24444", "server listening port")
 	pflag.String("http-addr", "localhost:8080", "http listening port")
 	pflag.Parse()
-	utils.Settings.BindPFlags(pflag.CommandLine)
+	if err := utils.Settings.BindPFlags(pflag.CommandLine); err != nil {
+		utils.Logger.Panic("parse command line arguments", zap.Error(err))
+	}
 
 	if utils.Settings.GetBool("debug") {
 		utils.SetupLogger("debug")

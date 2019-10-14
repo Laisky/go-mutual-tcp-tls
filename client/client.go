@@ -22,7 +22,9 @@ func setupArgs() {
 	pflag.String("addr", "localhost:24444", "client dial port")
 	pflag.Int("nfork", 1, "how many connections")
 	pflag.Parse()
-	utils.Settings.BindPFlags(pflag.CommandLine)
+	if err := utils.Settings.BindPFlags(pflag.CommandLine); err != nil {
+		utils.Logger.Panic("parse command line arguments", zap.Error(err))
+	}
 
 	if utils.Settings.GetBool("debug") {
 		utils.SetupLogger("debug")
