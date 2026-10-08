@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	middlewares "github.com/Laisky/go-utils/gin-middlewares"
+	middlewares "github.com/Laisky/gin-middlewares"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -34,10 +34,14 @@ func setupArgs() {
 	}
 
 	if utils.Settings.GetBool("debug") {
-		utils.SetupLogger("debug")
+		if err := utils.Logger.ChangeLevel("debug"); err != nil {
+			utils.Logger.Panic("change logger level", zap.Error(err))
+		}
 		utils.Logger.Info("run in debug mode")
 	} else { // prod mode
-		utils.SetupLogger("info")
+		if err := utils.Logger.ChangeLevel("info"); err != nil {
+			utils.Logger.Panic("change logger level", zap.Error(err))
+		}
 		utils.Logger.Info("run in prod mode")
 	}
 }
