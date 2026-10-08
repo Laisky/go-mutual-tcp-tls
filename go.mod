@@ -8,5 +8,6 @@ require (
 	github.com/Laisky/zap v1.19.3-0.20211118020215-b17f220cebee
 	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.7.7
+	github.com/prometheus/client_golang v1.11.1
 	github.com/spf13/pflag v1.0.5
 )
