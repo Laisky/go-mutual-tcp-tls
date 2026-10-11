@@ -7,7 +7,9 @@ require (
 	github.com/Laisky/go-utils v1.17.1
 	github.com/Laisky/zap v1.19.3-0.20211118020215-b17f220cebee
 	github.com/gin-contrib/pprof v1.3.0
-	github.com/gin-gonic/gin v1.7.7
+	github.com/gin-gonic/gin v1.9.0
 	github.com/prometheus/client_golang v1.11.1
 	github.com/spf13/pflag v1.0.5
+	github.com/ugorji/go v1.1.7 // indirect
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
